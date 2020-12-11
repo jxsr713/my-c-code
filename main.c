@@ -19,6 +19,7 @@ typedef struct module_info
 	char pressure_id[15];
 	char sensor1_id[15];		//对应盒子上水流量ADC1_9
 	char sensor2_id[15];		//ADC1_10
+
 	char sensor3_id[15];
 	char sensor4_id[15];
 	//char sensor1_id[15];
@@ -157,11 +158,11 @@ const value_string cmd_message_type[] = {
 
 };
 
-uint8_t parse_utility_cmd(char * cmdstring);
+uint8_t parse_utility_cmd(char * cmdstring, WT_Station_Setting * stn_info);
 uint8_t handle_sysinfo_cmd(char * cmdstring, uint8_t optType);
 
 //实验数据
-char * sys_info_test = "CMD01:w=STN_ID:1001,STN_NAME:stm_name_001,COMM_ID:20201222000001,STM_ID:123456789009,JIN_DU:100,JIN_FEN:2222,WEI_DU:33,WEI_FEN:4444,HD_ID:2020101000001112,HD_SAMP:30,PRE_ID:20201212010001,PRE_SAMP:25,S2_ID:2020101000001112,S3_ID:2020101000001112,S4_ID:2020101000001112,SENS_SAMP:1234,HD_SEND:30,DATA_SEND:5,COMM0_IP:201.212.256.231,COMM0_PT:8005,COMM0_IP:201.212.256.111,COMM0_PT:8115,RTC_SYNC:8\r\n";
+char * sys_info_test = "CMD01:w=STN_ID:1001,STN_NAME:stm_name_001,COMM_ID:20201222000001,STM_ID:123456789009,JIN_DU:100,JIN_FEN:2222,WEI_DU:33,WEI_FEN:4444,HD_ID:20201010001112,HD_SAMP:30,PRE_ID:20201212010001,PRE_SAMP:25,S2_ID:20201010001000,S3_ID:20201010111112,S4_ID:20201010001234,SENS_SAMP:1234,HD_SEND:30,DATA_SEND:5,COMM0_IP:201.212.256.231,COMM0_PT:8005,COMM0_IP:201.212.256.111,COMM0_PT:8115,RTC_SYNC:8\r\n";
 
 char * cmd_info_test = "CMD02:c=reset\r\n";
 //处理system info的数据请求，主要将站点基本信息，装配信息，配置信息返回给
@@ -200,7 +201,7 @@ uint8_t update_sysinfo(WT_Station_Setting * stn_info, uint8_t keyIndex, char * v
 	    /* STN INFO*/
         case 1: //"STN_ID"
             stn_info->stn_id = atol(matched);
-            printf("stn_info->stn_id = %x(%d)\r\n", stn_info->stn_id);
+            printf("stn_info->stn_id = %d\r\n", stn_info->stn_id);
             break;
         case 2: //"STN_NAME"
             strcpy(stn_info->stn_name, matched);
@@ -347,7 +348,7 @@ uint8_t update_sysinfo(WT_Station_Setting * stn_info, uint8_t keyIndex, char * v
 }
 
 //解析工具发送过来的操作命令;一般只有一个命令串，所以不用循环
-uint8_t parser_cmd_string(char * sysStr){
+uint8_t parser_cmd_string(char * sysStr, WT_Station_Setting * stn_info){
     char keyVal[100];
     char * ptr = sysStr;
     char * post = sysStr;
@@ -366,7 +367,7 @@ uint8_t parser_cmd_string(char * sysStr){
 
 
 //用于解析好有信息字段的
-uint8_t parser_sysinfo_string(char * sysStr){
+uint8_t parser_sysinfo_string(char * sysStr, WT_Station_Setting * stn_info){
     char keyVal[100];
     char * ptr = sysStr;
     char * post = sysStr;
@@ -383,7 +384,7 @@ uint8_t parser_sysinfo_string(char * sysStr){
         idx = match_keyString(keyVal, (char *)vals_message_type);
         printf("Get sub string:[%s]  idx:%d\r\n", keyVal, idx);
         if(idx != 0){
-            update_sysinfo(&stn_information, idx, keyVal);
+            update_sysinfo(stn_info, idx, keyVal);
         }
         //当前子串处理结束
         ptr = post;
@@ -398,7 +399,7 @@ uint8_t parser_sysinfo_string(char * sysStr){
 }
 
 //cmd format: CMDxx:(r/w)[=[key1]:[val1],[key2]:[val2],[keyx]:[valx];]\r\n
-uint8_t parse_utility_cmd(char * cmdstring) {
+uint8_t parse_utility_cmd(char * cmdstring, WT_Station_Setting * stn_info) {
     uint8_t cmdType = CMD_NONE;
 	uint8_t optType = OPT_NONE;
 	char *ptr = cmdstring;
@@ -442,10 +443,10 @@ uint8_t parse_utility_cmd(char * cmdstring) {
     //分析命令行后面的参数
     switch (optType) {
         case OPT_CMD:       //要执行命令
-            parser_sysinfo_string(ptr);
+            parser_sysinfo_string(ptr, stn_info);
             break;
         case OPT_WRITE:     //对于终端write操作是要更新结构体的
-            parser_sysinfo_string(ptr);
+            parser_sysinfo_string(ptr, stn_info);
             break;
         case OPT_READ:
             break;
@@ -476,14 +477,140 @@ uint8_t parse_utility_cmd(char * cmdstring) {
  * testing code 
  * ***************************************************************************/
 void test_parser(void){
-    printf("%s\r\n", sys_info_test);
-    parse_utility_cmd(sys_info_test);
+    // printf("%s\r\n", sys_info_test);
+    // parse_utility_cmd(sys_info_test);
 }
 
+
+/*****************************************************************************/
+// void wt_read_setting(WT_Station_Setting * stn_info){
+// 	WT_Station_Setting *ptr = (WT_Station_Setting *)g_setting_address;
+// 	memcpy(stn_info, ptr, sizeof(WT_Station_Setting));
+// 	return;
+
+// }
+
+void init_setting1(WT_Station_Setting * stn_info){
+    stn_info->stn_id =  12;
+    strcpy(stn_info->stn_name, "STN_0001");
+    strcpy(stn_info->stm32_id, "1234567890");
+    stn_info->jinDu = 100;
+    stn_info->jinFen = 110;
+    stn_info->weiDu = 120;
+    stn_info->weiFen = 140;
+    memset(stn_info->dev.comm_id, 0, sizeof(stn_info->dev.comm_id));
+    strcpy(stn_info->dev.comm_id , "2020121200001");
+    memset(stn_info->dev.hydro_id, 0, sizeof(stn_info->dev.hydro_id));
+    strcpy(stn_info->dev.hydro_id , "2020121209001");
+    memset(stn_info->dev.pressure_id, 0, sizeof(stn_info->dev.pressure_id));
+    strcpy(stn_info->dev.pressure_id , "2020121201001");
+    memset(stn_info->dev.sensor2_id, 0, sizeof(stn_info->dev.sensor2_id));
+    strcpy(stn_info->dev.sensor2_id , "2020121202001");
+    memset(stn_info->dev.sensor3_id, 0, sizeof(stn_info->dev.sensor3_id));
+    strcpy(stn_info->dev.sensor3_id , "2020121203001");
+    memset(stn_info->dev.sensor4_id, 0, sizeof(stn_info->dev.sensor4_id));
+    strcpy(stn_info->dev.sensor4_id , "2020121205001");
+    stn_info->setting.hydro_sample_interval = 30;
+    stn_info->setting.pressure_sample_interval = 25;
+    stn_info->setting.sensors_sample_interval = 1;
+    stn_info->setting.sensors_send_interval = 5;
+    stn_info->setting.hydro_gain = -10;
+    stn_info->setting.HYDRO_sample_rate = 8000;
+    stn_info->setting.hydro_sample_length = 10;
+}
+
+void init_setting2(WT_Station_Setting * stn_info){
+    stn_info->stn_id =  11;
+    strcpy(stn_info->stn_name, "STN_0xxx");
+    strcpy(stn_info->stm32_id, "AAAAAAAAA");
+    stn_info->jinDu = 100;
+    stn_info->jinFen = 110;
+    stn_info->weiDu = 120;
+    stn_info->weiFen = 140;
+    memset(stn_info->dev.comm_id, 0, sizeof(stn_info->dev.comm_id));
+    strcpy(stn_info->dev.comm_id , "2020121100001");
+    memset(stn_info->dev.hydro_id, 0, sizeof(stn_info->dev.hydro_id));
+    strcpy(stn_info->dev.hydro_id , "2020120109001");
+    memset(stn_info->dev.pressure_id, 0, sizeof(stn_info->dev.pressure_id));
+    strcpy(stn_info->dev.pressure_id , "2020122201001");
+    memset(stn_info->dev.sensor2_id, 0, sizeof(stn_info->dev.sensor2_id));
+    strcpy(stn_info->dev.sensor2_id , "2021121202001");
+    memset(stn_info->dev.sensor3_id, 0, sizeof(stn_info->dev.sensor3_id));
+    strcpy(stn_info->dev.sensor3_id , "2022121203001");
+    memset(stn_info->dev.sensor4_id, 0, sizeof(stn_info->dev.sensor4_id));
+    strcpy(stn_info->dev.sensor4_id , "2023121205001");
+    stn_info->setting.hydro_sample_interval = 30;
+    stn_info->setting.pressure_sample_interval = 25;
+    stn_info->setting.sensors_sample_interval = 1;
+    stn_info->setting.sensors_send_interval = 5;
+    stn_info->setting.hydro_gain = -10;
+    stn_info->setting.HYDRO_sample_rate = 8000;
+    stn_info->setting.hydro_sample_length = 10;
+}
+
+WT_Station_Setting setting1;
+WT_Station_Setting setting2;
+WT_Station_Setting setting3;
+
+void save_setting(WT_Station_Setting * dest, WT_Station_Setting * src)
+{
+    memcpy(dest, src, sizeof(WT_Station_Setting));
+
+    return;
+}
+
+void print_info(WT_Station_Setting *stn_info){
+    printf("======================================================================================\r\n");
+    printf("stn_info->stn_id =      %d\r\n", stn_info->stn_id);
+    printf("stn_info->stn_name =    %s\r\n", stn_info->stn_name);
+    printf("stn_info->stm32_id =    %x-%x-%x-%x-%x-%x-%x-%x-%x\r\n", stn_info->stm32_id[0],
+            stn_info->stm32_id[1], stn_info->stm32_id[2], stn_info->stm32_id[3], 
+            stn_info->stm32_id[4], stn_info->stm32_id[5], stn_info->stm32_id[6], 
+            stn_info->stm32_id[7], stn_info->stm32_id[8], stn_info->stm32_id[9]);
+    printf("stn_info->jinDu =   (%d)\r\n", stn_info->jinDu);
+    printf("stn_info->jinFen =  (%d)\r\n", stn_info->jinFen);
+    printf("stn_info->weiDu =   (%d)\r\n", stn_info->weiDu);
+    printf("stn_info->weiFen =  (%d)\r\n", stn_info->weiFen);
+    printf("stn_info->weiFen =  (%d)\r\n", stn_info->weiFen);
+    printf("stn_info->dev.hydro_id =    %s\r\n", stn_info->dev.hydro_id);
+    printf("stn_info->dev.pressure_id = %s\r\n", stn_info->dev.pressure_id);
+    printf("stn_info->dev.sensor2_id =  %s\r\n", stn_info->dev.sensor2_id);
+    printf("stn_info->dev.sensor3_id =  %s\r\n", stn_info->dev.sensor3_id);
+    printf("stn_info->dev.sensor4_id =  %s\r\n", stn_info->dev.sensor4_id);
+    printf("stn_info->setting.hydro_sample_interval =       %d\r\n", stn_info->setting.hydro_sample_interval);
+    printf("stn_info->setting.pressure_sample_interval =    %d\r\n", stn_info->setting.pressure_sample_interval);
+    printf("stn_info->setting.sensors_sample_interval =     %d\r\n", stn_info->setting.sensors_sample_interval);
+    printf("stn_info->setting.sensors_send_interval =       %d\r\n", stn_info->setting.sensors_send_interval);
+    printf("stn_info->setting.rtc_sysnc_hour =  %d\r\n", stn_info->setting.rtc_sysnc_hour);
+    printf("stn_info->setting.hydro_gain =      %d\r\n", stn_info->setting.hydro_gain);
+    printf("stn_info->setting.HYDRO_sample_rate =   %d\r\n", stn_info->setting.HYDRO_sample_rate);
+    printf("stn_info->setting.hydro_sample_length = %d\r\n", stn_info->setting.hydro_sample_length);
+    printf("stn_info->server[0].ip =        %s\r\n", stn_info->server[0].ip);
+    printf("stn_info->server[0].lte_Port =  %d\r\n", stn_info->server[0].lte_Port);
+    printf("stn_info->server[1].ip =        %s\r\n", stn_info->server[1].ip);
+    printf("stn_info->server[1].lte_Port =  %d\r\n", stn_info->server[1].lte_Port);
+    printf("======================================================================================\r\n\r\n\r\n");
+}
 
 int main()
 {
     //cout << "Hello world!" <<endl;
-    test_parser();
+    init_setting1(&setting1);
+    printf("========SETTING1===========\r\n");
+    print_info(&setting1);
+
+    init_setting2(&setting2);
+    save_setting(&setting3, &setting2);
+    printf("========SETTING2===========\r\n");
+    print_info(&setting2);
+    printf("========SETTING3==========\r\n");
+    print_info(&setting3);
+    printf("%s\r\n", sys_info_test);
+    parse_utility_cmd(sys_info_test, &setting1);    
+    print_info(&setting1); 
+    save_setting(&setting3, &setting1);
+    printf("========SETTING3===========\r\n");
+    print_info(&setting3); 
+    //test_parser();
     return 0;
 }
